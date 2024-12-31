@@ -1,43 +1,42 @@
-# Neo4j Cricket Analytics with Python and Cypher Queries
+# FAERS Graph Analytics with Python and Cypher Queries
 
-This documentation provides a comprehensive guide to creating a cricket analytics project using **Neo4j Aura** as the graph database, **Cypher queries** for data analysis, and Python for programmatic interaction. The project focuses on analyzing cricket match data, player statistics, and team performances using a graph-based approach.
+This documentation provides a comprehensive guide to creating a FAERS (FDA Adverse Event Reporting System) analytics project using **Neo4j** as the graph database, **Cypher queries** for data analysis, and Python for programmatic interaction. The project focuses on analyzing drug adverse event reports, their outcomes, and related details using a graph-based approach.
 
 ---
 
 ## **Project Overview**
 
-Cricket analytics involves exploring and analyzing cricket match data to extract insights. Graph databases like Neo4j are well-suited for such projects due to their ability to model complex relationships between players, teams, matches, and events.
+FAERS analytics involves exploring and analyzing adverse event reports to extract meaningful insights. Neo4j's ability to model complex relationships makes it ideal for understanding the intricate connections between cases, drugs, reactions, manufacturers, and outcomes.
 
 Key Features:
-1. Create a graph database representing cricket data (teams, players, matches, dismissals).
-2. Perform complex analyses using Cypher queries.
-3. Interact with Neo4j using Python for automation and dynamic insights.
+1. Create a graph database representing FAERS data (cases, drugs, reactions, outcomes, manufacturers).
+2. Perform advanced analyses using Cypher queries.
+3. Automate queries and extract insights programmatically using Python.
 
 ---
 
 ## **Tools and Technologies**
 
-- **Neo4j Aura**: A cloud-based Neo4j database.
-- **Cypher**: Neo4j's query language for graph data.
-- **Python**: To automate queries and extract insights.
-- **neo4j Python Driver**: For connecting and querying Neo4j from Python.
+- **Neo4j**: Graph database to store and query FAERS data.
+- **Cypher**: Query language for Neo4j.
+- **Python**: Automates interactions with Neo4j and extracts data insights.
+- **Neo4j Python Driver**: Enables Python programs to interact with Neo4j.
 
 ---
 
 ## **Setup**
 
-### **1. Neo4j Aura Account**
+### **1. Neo4j Setup**
 
-1. Sign up at [Neo4j Aura](https://neo4j.com/cloud/aura/).
-2. Create a free database (Aura Free Tier).
-3. Note down the connection credentials:
-   - Bolt URI
-   - Username
-   - Password
+1. Install Neo4j Community Edition or sign up for Neo4j Aura.
+2. Create a new database and note the connection details:
+   - **Bolt URI**
+   - **Username**
+   - **Password**
 
 ### **2. Install Python Dependencies**
 
-Ensure Python is installed on your system. Install the Neo4j Python driver:
+Ensure Python is installed. Then, install the Neo4j Python driver:
 
 ```bash
 pip install neo4j
@@ -47,159 +46,119 @@ pip install neo4j
 
 ## **Dataset**
 
-We generate a fake cricket dataset using Python to populate the database. The dataset includes:
+### **Overview**
 
-- Players: Name, role (batsman, bowler, all-rounder), batting and bowling statistics.
-- Teams: Name, matches won and lost.
-- Matches: Match ID, date, location, teams, and events.
+The dataset includes the following entities and their relationships:
+
+- **Nodes**:
+  - `Case`: Individual reports of adverse events.
+  - `Drug`: Medications involved in the cases.
+  - `Reaction`: Adverse reactions reported.
+  - `Outcome`: Long-term results of adverse events.
+  - `Manufacturer`: Companies producing the drugs.
+  - `AgeGroup`: Categorized age groups of the individuals in cases.
+
+- **Relationships**:
+  - `IS_PRIMARY_SUSPECT`, `IS_SECONDARY_SUSPECT`, `IS_CONCOMITANT`: Drug roles in a case.
+  - `HAS_REACTION`: Links cases to reported reactions.
+  - `RESULTED_IN`: Links cases to outcomes.
+  - `REGISTERED`: Links drugs to manufacturers.
+  - `FALLS_UNDER`: Links cases to age groups.
 
 ### **Data Model**
 
-The data is modeled as a graph with the following nodes and relationships:
+The FAERS data is structured as a graph with nodes and relationships:
 
-- **Nodes**:
-  - `Player`
-  - `Team`
-  - `Match`
-
-- **Relationships**:
-  - `PLAYS_FOR`: Links a `Player` to a `Team`.
-  - `PLAYED_IN`: Links a `Player` to a `Match`.
-  - `WON` / `LOST`: Links a `Team` to a `Match`.
-  - `DISMISSED_BY`: Links a `Player` (batsman) to another `Player` (bowler).
-
----
-
-## **Step 1: Generate Data**
-
-We use Python to create a dataset and upload it to Neo4j.
-
-```python
-from random import randint, choice
-from datetime import datetime, timedelta
-import json
-
-# Generate fake players
-roles = ["Batsman", "Bowler", "All-rounder"]
-teams = ["Team A", "Team B", "Team C", "Team D"]
-
-players = []
-for i in range(1, 51):
-    player = {
-        "name": f"Player {i}",
-        "role": choice(roles),
-        "team": choice(teams),
-    }
-    players.append(player)
-
-# Generate fake matches
-matches = []
-locations = ["Mumbai", "Sydney", "London", "Dubai"]
-
-start_date = datetime(2020, 1, 1)
-for i in range(1, 21):
-    match_date = start_date + timedelta(days=randint(0, 1000))
-    match = {
-        "match_id": i,
-        "date": match_date.strftime('%Y-%m-%d'),
-        "location": choice(locations),
-        "teams": [choice(teams), choice(teams)],
-    }
-    matches.append(match)
-
-# Save data to JSON
-with open("players.json", "w") as f:
-    json.dump(players, f, indent=4)
-
-with open("matches.json", "w") as f:
-    json.dump(matches, f, indent=4)
-
-print("Data generated and saved to players.json and matches.json.")
+```plaintext
+(:Case {primaryid, age, gender, reportDate, ...})
+  -[:IS_PRIMARY_SUSPECT]-> (:Drug {name, primarySubstance, ...})
+  -[:REGISTERED]-> (:Manufacturer {manufacturerName, ...})
+  -[:HAS_REACTION]-> (:Reaction {description, ...})
+  -[:RESULTED_IN]-> (:Outcome {outcome, ...})
 ```
 
 ---
 
-## **Step 2: Import Data into Neo4j**
+## **Cypher Queries**
 
-Use Cypher queries in Neo4j to load the generated data.
+Below are key Cypher queries to analyze the FAERS graph data:
 
-### **1. Upload Player Data**
+### **1. Retrieve All Drugs Prescribed for a Specific Case**
 
 ```cypher
-LOAD CSV WITH HEADERS FROM 'file:///players.json' AS row
-CREATE (:Player {name: row.name, role: row.role});
+MATCH (c:Case {primaryid: 100654764})
+OPTIONAL MATCH (c)-[:IS_PRIMARY_SUSPECT]->(d:Drug)
+OPTIONAL MATCH (c)-[:IS_SECONDARY_SUSPECT]->(ds:Drug)
+OPTIONAL MATCH (c)-[:IS_CONCOMITANT]->(dc:Drug)
+RETURN c.primaryid AS CaseID,
+       COLLECT(d.name) AS PrimarySuspectDrugs,
+       COLLECT(ds.name) AS SecondarySuspectDrugs,
+       COLLECT(dc.name) AS ConcomitantDrugs;
 ```
 
-### **2. Upload Team Data**
+### **2. Get Reactions Reported for a Specific Drug**
 
 ```cypher
-UNWIND $teams AS team
-CREATE (:Team {name: team});
+MATCH (d:Drug {name: "DEXAMETHASONE"})<-[:IS_PRIMARY_SUSPECT]-(c:Case)-[:HAS_REACTION]->(r:Reaction)
+RETURN d.name AS DrugName, COLLECT(r.description) AS Reactions;
 ```
 
-### **3. Upload Match Data**
+### **3. Count Cases for Each Outcome**
 
 ```cypher
-LOAD CSV WITH HEADERS FROM 'file:///matches.json' AS row
-CREATE (:Match {match_id: row.match_id, date: row.date, location: row.location});
+MATCH (c:Case)-[:RESULTED_IN]->(o:Outcome)
+RETURN o.outcome AS Outcome, COUNT(c) AS CaseCount;
 ```
 
----
+### **4. Retrieve Cases Involving a Specific Age Group**
 
-## **Step 3: Analysis Using Cypher Queries**
-
-Here are some advanced queries to analyze the data:
-
-### **1. List All Players in a Specific Team**
 ```cypher
-MATCH (p:Player)-[:PLAYS_FOR]->(t:Team {name: 'Team A'})
-RETURN p.name AS Player, p.role AS Role;
+MATCH (c:Case)-[:FALLS_UNDER]->(a:AgeGroup {ageGroup: "Adult"})
+RETURN c.primaryid AS CaseID, c.age AS Age, c.gender AS Gender, c.reporterOccupation AS Reporter;
 ```
 
-### **2. Find Matches Played by a Team**
-```cypher
-MATCH (t:Team {name: 'Team B'})-[:WON|LOST]->(m:Match)
-RETURN m.match_id AS MatchID, m.date AS Date, m.location AS Location;
-```
+### **5. Identify Manufacturers Linked to Adverse Reactions**
 
-### **3. Find Players Dismissed by a Bowler**
 ```cypher
-MATCH (b:Player {name: 'Player 1'})-[:DISMISSED_BY]->(p:Player)
-RETURN p.name AS Batsman;
-```
-
-### **4. Player Performance in All Matches**
-```cypher
-MATCH (p:Player {name: 'Player 10'})-[:PLAYED_IN]->(m:Match)
-RETURN m.match_id AS MatchID, m.date AS Date, m.location AS Location;
+MATCH (m:Manufacturer)<-[:REGISTERED]-(d:Drug)<-[:IS_PRIMARY_SUSPECT]-(c:Case)-[:HAS_REACTION]->(r:Reaction {description: "Insomnia"})
+RETURN m.manufacturerName AS Manufacturer, COUNT(c) AS CaseCount;
 ```
 
 ---
 
-## **Step 4: Automate Queries in Python**
+## **Python Integration**
 
-Use the following Python code to execute queries programmatically.
+### **Connecting to Neo4j**
+
+The following Python script demonstrates how to run Cypher queries:
 
 ```python
 from neo4j import GraphDatabase
 
+# Neo4j credentials
+uri = "bolt://<HOST>:<PORT>"  # Replace with your Neo4j host and port
+username = "neo4j"            # Your Neo4j username
+password = "<PASSWORD>"       # Your Neo4j password
+
 # Connect to Neo4j
-driver = GraphDatabase.driver("neo4j+s://<bolt-uri>", auth=("<username>", "<password>"))
+driver = GraphDatabase.driver(uri, auth=(username, password))
 
-def run_query(tx, query, parameters=None):
-    result = tx.run(query, parameters)
-    return [record for record in result]
-
-def list_players_in_team(team_name):
-    query = """
-    MATCH (p:Player)-[:PLAYS_FOR]->(t:Team {name: $team_name})
-    RETURN p.name AS Player, p.role AS Role
-    """
+# Function to execute a query
+def run_query(query):
     with driver.session() as session:
-        return session.read_transaction(run_query, query, {"team_name": team_name})
+        result = session.run(query)
+        return [record.data() for record in result]
 
-players = list_players_in_team("Team A")
-print(players)
+# Example: Query for reactions to a drug
+query = """
+MATCH (d:Drug {name: "DEXAMETHASONE"})<-[:IS_PRIMARY_SUSPECT]-(c:Case)-[:HAS_REACTION]->(r:Reaction)
+RETURN d.name AS DrugName, COLLECT(r.description) AS Reactions;
+"""
+results = run_query(query)
+
+# Print results
+for record in results:
+    print(record)
 
 # Close connection
 driver.close()
@@ -209,4 +168,4 @@ driver.close()
 
 ## **Conclusion**
 
-This project demonstrates how to use Neo4j Aura and Python to analyze cricket data effectively. By modeling relationships in a graph, you can perform complex queries that are difficult in relational databases. 
+This project showcases how to leverage Neo4j and Python to analyze complex datasets like FAERS. By modeling relationships as a graph, the project enables detailed insights that are challenging to achieve with traditional databases. Future extensions could include integrating machine learning for predictive analytics or building a user interface for easier data exploration.
